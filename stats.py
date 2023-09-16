@@ -158,16 +158,27 @@ def update_player_data(players: list):
 
     print("Updating player data done.")
 
-def collect_pl_data(client: Client, players: list):
-    battles_data = []
-    new_players = []
+def get_players_battlelogs(client: Client, players: list) -> dict:
+    battlelogs = {}
     for player in players:
-        new_battles = 0
         battlelog = client.get_player_battlelog(convert_id_to_fetchable_id(player.tag))
         if battlelog is None:
-            print("Couldn't retrieve battlelog for player with tag {0}. Moving on to the next player.".format(player.tag))
+            print("Couldn't retrieve battlelog for player with tag {}. Moving on to the next player.".format(player.tag))
             continue
-        
+
+        battlelogs[player] = battlelog
+
+        print("Finished to retrieve battlelog for player with tag {}.".format(player.tag))
+
+    return battlelogs
+
+def collect_pl_data(client: Client, players: list) -> list:
+    battles_data: list = []
+    new_players: list = []
+    battlelogs: dict = get_players_battlelogs(client, players)
+
+    for player, battlelog in battlelogs.items():
+        new_battles = 0
         battles_dict = battlelog["items"]
         for battle_dict in reversed(battles_dict):
             battle = battle_dict["battle"]
@@ -195,8 +206,6 @@ def collect_pl_data(client: Client, players: list):
                 (winner_side, loser_side) = get_teams_status(player.tag, battle, match_status)
                 battle_data.set_battle_data(battle, winner_side, loser_side)
                 battles_data.append(battle_data)
-
-        print("Finished to retrieve battlelog for player with tag {}. New battles found : {}.".format(player.tag, new_battles))
 
     players.extend(new_players)
 
@@ -250,7 +259,7 @@ client = Client(TOKEN)
 
 try:
     while True:
-        start = time.time
+        start = time.time()
         battles_data = collect_pl_data(client, players)
         if len(battles_data) != 0:
             update_player_data(players)
@@ -258,7 +267,7 @@ try:
         else:
             print("Updating player data skipped. No new battes.")
             print("Saving player data skipped. No new battes.")
-        end = time.time
+        end = time.time()
         print("Time taken : {} min, {} seconds.".format((end - start) // 60, (end - start) % 60))
 except KeyboardInterrupt:
     pass
