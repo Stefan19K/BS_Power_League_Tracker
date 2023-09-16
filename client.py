@@ -10,7 +10,10 @@ class Client:
 
     def get_player_battlelog(self, tag):
         url = PLAYERS_URL + tag + BATTLELOG_URL
-        res = req.get(url=url, headers=self.headers)
+        try:
+            res = req.get(url=url, headers=self.headers)
+        except req.exceptions.RequestException as _:
+            return None
 
         if res.status_code == 200:
             json_object = json.loads(res.content)
