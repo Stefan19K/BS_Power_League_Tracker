@@ -1,4 +1,5 @@
 from enum import Enum
+import time
 from client import Client
 import openpyxl
 from globals.globals_season20 import *
@@ -50,18 +51,16 @@ class Region(Enum):
 class PlayerData:
     def __init__(self):
         self.tag = ""
-        self.rank = ""
-        self.region = Region.NONE
         self.l_game_checked = None
 
     def print(self):
-        print("Player_data : [tag : {0}, rank : {1}, region : {2}, l_game_checked : {3}]".format(self.tag, self.rank, self.region, self.l_game_checked))
+        print("Player_data : [tag : {}, l_game_checked : {}]".format(self.tag, self.l_game_checked))
 
     def str(self):
         if self.l_game_checked is None:
-            return self.tag + " " + self.rank + " " + self.region.to_str() + "\n"
+            return self.tag + "\n"
         else:
-            return self.tag + " " + self.rank + " " + self.region.to_str() + " " + self.l_game_checked + "\n"
+            return self.tag + " " + self.l_game_checked + "\n"
     
 class BattleData:
     def __init__(self, map: str):
@@ -109,13 +108,33 @@ def set_player_fields(fields: list):
     if fields_len > 0:
         player.tag = fields[0]
     if fields_len > 1:
-        player.rank = fields[1]
-    if fields_len > 2:
-        player.region = Region.to_region(fields[2])
-    if fields_len > 3:
-        player.l_game_checked = fields[3]
+        player.l_game_checked = fields[1]
 
     return player
+
+def tag_not_in_lists(tag: str, old_players: list, new_players: list):
+    for player in old_players:
+        if tag == player.tag:
+            return False
+        
+    for player in new_players:
+        if tag == player.tag:
+            return False
+
+    return True
+
+def add_new_player(new_players: list, tag: str):
+    new_player = PlayerData()
+    new_player.tag = tag
+    new_players.append(new_player)
+
+def add_players(old_players: list, new_players: list, battle: dict):
+    teams = battle["teams"]
+    for team in teams:
+        for player in team:
+            if tag_not_in_lists(player["tag"], old_players, new_players) == True \
+            and len(old_players) + len(new_players) < MAX_NR_PLAYERS:
+                add_new_player(new_players, player["tag"])
 
 def read_player_data():
     players = []
@@ -141,6 +160,7 @@ def update_player_data(players: list):
 
 def collect_pl_data(client: Client, players: list):
     battles_data = []
+    new_players = []
     for player in players:
         new_battles = 0
         battlelog = client.get_player_battlelog(convert_id_to_fetchable_id(player.tag))
@@ -162,6 +182,8 @@ def collect_pl_data(client: Client, players: list):
                 continue
             
             if battle.get("starPlayer") is not None:
+                add_players(players, new_players, battle)
+
                 new_battles += 1
                 player.l_game_checked = battle_dict["battleTime"]
 
@@ -174,9 +196,11 @@ def collect_pl_data(client: Client, players: list):
                 battle_data.set_battle_data(battle, winner_side, loser_side)
                 battles_data.append(battle_data)
 
-        print("Finished to retrieve battlelog for player with tag {0}. New battles found : {1}.".format(player.tag, new_battles))
+        print("Finished to retrieve battlelog for player with tag {}. New battles found : {}.".format(player.tag, new_battles))
 
-    print("Finished to retrieve battlelogs. Total new battles found : {0}.".format(len(battles_data)))
+    players.extend(new_players)
+
+    print("Finished to retrieve battlelogs.\nTotal new battles found : {}.\nTotal new players added : {}".format(len(battles_data), len(new_players)))
 
     return battles_data
 
@@ -193,7 +217,6 @@ def save_pl_data(battles_data: list):
             continue
 
         new_battles += 1
-        battle_data.print()
         
         for brawler in battle_data.winner_brawlers:
             brawler_row = BRAWLERS.get(brawler)
@@ -227,6 +250,7 @@ client = Client(TOKEN)
 
 try:
     while True:
+        start = time.time
         battles_data = collect_pl_data(client, players)
         if len(battles_data) != 0:
             update_player_data(players)
@@ -234,5 +258,7 @@ try:
         else:
             print("Updating player data skipped. No new battes.")
             print("Saving player data skipped. No new battes.")
+        end = time.time
+        print("Time taken : {} min, {} seconds.".format((end - start) // 60, (end - start) % 60))
 except KeyboardInterrupt:
     pass
