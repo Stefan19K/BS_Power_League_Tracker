@@ -1,3 +1,4 @@
+import concurrent.futures
 from enum import Enum
 import time
 from client import Client
@@ -158,17 +159,31 @@ def update_player_data(players: list):
 
     print("Updating player data done.")
 
+def parallel_func(client: Client, tag : str) -> dict:
+    battlelog = client.get_player_battlelog(convert_id_to_fetchable_id(tag))
+    if battlelog is None:
+        print("Couldn't retrieve battlelog for player with tag {}. Moving on to the next player.".format(tag))
+        return None
+    
+    print("Finished to retrieve battlelog for player with tag {}.".format(tag))
+
+    return battlelog
+
 def get_players_battlelogs(client: Client, players: list) -> dict:
     battlelogs = {}
-    for player in players:
-        battlelog = client.get_player_battlelog(convert_id_to_fetchable_id(player.tag))
-        if battlelog is None:
-            print("Couldn't retrieve battlelog for player with tag {}. Moving on to the next player.".format(player.tag))
-            continue
 
-        battlelogs[player] = battlelog
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
+        future_to_player = {executor.submit(parallel_func, client, player.tag) : player for player in players}
 
-        print("Finished to retrieve battlelog for player with tag {}.".format(player.tag))
+    for future in concurrent.futures.as_completed(future_to_player):
+        player = future_to_player[future]
+        try:
+            battlelog = future.result()
+        except Exception as exc:
+            print('%r generated an exception: %s' % (player.tag, exc))
+        else:
+            if battlelog is not None:
+                battlelogs.update({player : battlelog})
 
     return battlelogs
 
