@@ -1,6 +1,10 @@
 SEASON = "season20"
 
-TOKEN = "INSERT AUTH TOKEN HERE"
+MAX_NR_PLAYERS = 96000
+MAX_THREADS = 44
+MAX_CONCURRENCY = 250
+
+TOKEN = ""
 
 HEADERS = {'Authorization': 'Bearer {}'.format(TOKEN)}
 
