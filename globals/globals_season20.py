@@ -17,6 +17,10 @@ LI = 16
 PLAYERS_URL = "https://api.brawlstars.com/v1/players/"
 BATTLELOG_URL = "/battlelog"
 
+# Git related constants
+PATH_TO_GIT_REPO = ".git"
+COMMIT_MESSAGE = "updated stats up to date"
+
 # Excell related constants
 FILE_PATH = "excell_data/season20_data.xlsx"
 FILE_QUERY_PATH = "season20_data_query.xlsx"
