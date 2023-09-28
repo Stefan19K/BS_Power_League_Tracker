@@ -1,6 +1,6 @@
 from enum import Enum
 import openpyxl
-from globals.globals_season19 import *
+from globals.globals_season20 import *
 import shutil
 import os
 import pygame
