@@ -1,16 +1,9 @@
-import concurrent.futures
+from concurrently import concurrently
 from enum import Enum
 import time
-from client import Client
+from client import *
 import openpyxl
 from globals.globals_season20 import *
-
-def convert_id_to_fetchable_id(id: str):
-    if id[0] == '#' or id[0:2] != "%23":
-        return "%23" + id[1:]
-    
-    return id    
-    # add more code here to treat possible cases
 
 class Rank(Enum):
     LI_M = 0
@@ -113,11 +106,7 @@ def set_player_fields(fields: list):
 
     return player
 
-def tag_not_in_lists(tag: str, old_players: list, new_players: list):
-    for player in old_players:
-        if tag == player.tag:
-            return False
-        
+def tag_not_in_list(tag: str, new_players: list):        
     for player in new_players:
         if tag == player.tag:
             return False
@@ -129,12 +118,11 @@ def add_new_player(new_players: list, tag: str):
     new_player.tag = tag
     new_players.append(new_player)
 
-def add_players(old_players: list, new_players: list, battle: dict):
+def add_players(new_players: list, battle: dict):
     teams = battle["teams"]
     for team in teams:
         for player in team:
-            if tag_not_in_lists(player["tag"], old_players, new_players) == True \
-            and len(old_players) + len(new_players) < MAX_NR_PLAYERS:
+            if tag_not_in_list(player["tag"], new_players) == True:
                 add_new_player(new_players, player["tag"])
 
 def read_player_data():
@@ -159,72 +147,62 @@ def update_player_data(players: list):
 
     print("Updating player data done.")
 
-def parallel_func(client: Client, tag : str) -> dict:
-    battlelog = client.get_player_battlelog(convert_id_to_fetchable_id(tag))
+def get_battles(player: PlayerData) -> list:
+    battles_data = []
+    new_players = []
+
+    battlelog = Client.get_player_battlelog(player.tag)
+
     if battlelog is None:
-        print("Couldn't retrieve battlelog for player with tag {}. Moving on to the next player.".format(tag))
-        return None
+        return (battles_data, new_players)
     
-    print("Finished to retrieve battlelog for player with tag {}.".format(tag))
+    new_battles = 0
+    battles_dict = battlelog["items"]
+    for battle_dict in reversed(battles_dict):
+        battle = battle_dict["battle"]
 
-    return battlelog
+        if battle.get("type") is None:
+            continue
+            
+        if battle.get("type") != "soloRanked":
+            continue
+            
+        if player.l_game_checked is not None and battle_dict["battleTime"] <= player.l_game_checked:
+            continue
 
-def get_players_battlelogs(client: Client, players: list) -> dict:
-    battlelogs = {}
+        if MAPS.get(battle_dict["event"]["map"]) is None:
+            continue
+            
+        if battle.get("starPlayer") is not None:
+            add_players(new_players, battle)
+            new_battles += 1
+            player.l_game_checked = battle_dict["battleTime"]
+            match_status = True
+            if battle["result"] == "defeat":
+                match_status = False
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
-        future_to_player = {executor.submit(parallel_func, client, player.tag) : player for player in players}
+            battle_data = BattleData(battle_dict["event"]["map"])
+            (winner_side, loser_side) = get_teams_status(player.tag, battle, match_status)
+            battle_data.set_battle_data(battle, winner_side, loser_side)
+            battles_data.append(battle_data)
 
-    for future in concurrent.futures.as_completed(future_to_player):
-        player = future_to_player[future]
-        try:
-            battlelog = future.result()
-        except Exception as exc:
-            print('%r generated an exception: %s' % (player.tag, exc))
-        else:
-            if battlelog is not None:
-                battlelogs.update({player : battlelog})
+    return (battles_data, new_players)
 
-    return battlelogs
-
-def collect_pl_data(client: Client, players: list) -> list:
+def collect_pl_data(players: list) -> list:
     battles_data: list = []
-    new_players: list = []
-    battlelogs: dict = get_players_battlelogs(client, players)
+    new_players_data: list = []
 
-    for player, battlelog in battlelogs.items():
-        new_battles = 0
-        battles_dict = battlelog["items"]
-        for battle_dict in reversed(battles_dict):
-            battle = battle_dict["battle"]
+    for (_, (player_battles, new_players)) in concurrently(handler=get_battles, inputs=players, max_concurrency=MAX_CONCURRENCY):
+        battles_data.extend(player_battles)
+        for new_player in new_players:
+            if len(players) + len(new_players_data) < MAX_NR_PLAYERS \
+                and tag_not_in_list(new_player.tag, players) == True \
+                and tag_not_in_list(new_player.tag, new_players_data) == True:
+                new_players_data.append(new_player)
 
-            if battle.get("type") is None:
-                continue
-            
-            if battle.get("type") != "soloRanked":
-                continue
-            
-            if player.l_game_checked is not None and battle_dict["battleTime"] <= player.l_game_checked:
-                continue
-            
-            if battle.get("starPlayer") is not None:
-                add_players(players, new_players, battle)
+    players.extend(new_players_data)
 
-                new_battles += 1
-                player.l_game_checked = battle_dict["battleTime"]
-
-                match_status = True
-                if battle["result"] == "defeat":
-                    match_status = False
-
-                battle_data = BattleData(battle_dict["event"]["map"])
-                (winner_side, loser_side) = get_teams_status(player.tag, battle, match_status)
-                battle_data.set_battle_data(battle, winner_side, loser_side)
-                battles_data.append(battle_data)
-
-    players.extend(new_players)
-
-    print("Finished to retrieve battlelogs.\nTotal new battles found : {}.\nTotal new players added : {}".format(len(battles_data), len(new_players)))
+    print("Finished to retrieve battlelogs.\nTotal new battles found : {}.\nTotal new players added : {}".format(len(battles_data), len(new_players_data)))
 
     return battles_data
 
@@ -270,12 +248,10 @@ def save_pl_data(battles_data: list):
 
 players = read_player_data()
 
-client = Client(TOKEN)
-
 try:
     while True:
         start = time.time()
-        battles_data = collect_pl_data(client, players)
+        battles_data = collect_pl_data(players)
         if len(battles_data) != 0:
             update_player_data(players)
             save_pl_data(battles_data)
@@ -283,6 +259,6 @@ try:
             print("Updating player data skipped. No new battes.")
             print("Saving player data skipped. No new battes.")
         end = time.time()
-        print("Time taken : {} min, {} seconds.".format((end - start) // 60, (end - start) % 60))
+        print("Time taken : {} min, {} seconds.".format((end - start) // 60, round((end - start) % 60, 2)))
 except KeyboardInterrupt:
     pass
