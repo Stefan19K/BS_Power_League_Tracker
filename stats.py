@@ -1,3 +1,4 @@
+from git import Repo
 from concurrently import concurrently
 from enum import Enum
 import time
@@ -82,6 +83,16 @@ class BattleData:
 
     def print(self):
         print("Battle_data : [map : {0}, rank : {1}, winner_brawlers : {2}, loser_brawlers : {3}]".format(self.map, self.rank, self.winner_brawlers, self.loser_brawlers))
+
+def git_push():
+    try:
+        repo = Repo(PATH_TO_GIT_REPO)
+        repo.git.add(FILE_PATH1, u=True)
+        repo.index.commit(COMMIT_MESSAGE)
+        origin = repo.remote(name="origin")
+        origin.push
+    except:
+        print("Some error occured while pushing the code")
 
 def get_teams_status(tag: str, battle: dict, match_status: bool):
     for player in battle["teams"][0]:
@@ -207,7 +218,7 @@ def collect_pl_data(players: list) -> list:
     return battles_data
 
 def save_pl_data(battles_data: list):
-    wb_obj = openpyxl.load_workbook(FILE_PATH)
+    wb_obj = openpyxl.load_workbook(FILE_PATH1)
     new_battles = 0
 
     for battle_data in battles_data:
@@ -242,7 +253,7 @@ def save_pl_data(battles_data: list):
 
             picks_cell.value = int(picks_cell.value) + 1
 
-    wb_obj.save(FILE_PATH)
+    wb_obj.save(FILE_PATH1)
 
     print("Saving player data done. {0} new battles registered.".format(new_battles))
 
@@ -255,6 +266,7 @@ try:
         if len(battles_data) != 0:
             update_player_data(players)
             save_pl_data(battles_data)
+            git_push()
         else:
             print("Updating player data skipped. No new battes.")
             print("Saving player data skipped. No new battes.")
