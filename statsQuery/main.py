@@ -3,10 +3,13 @@ import openpyxl
 from globals.globals_season20 import *
 import shutil
 import os
-from git import Repo
+# from git import Repo
 import tempfile
 import pygame
 from pygame.locals import *
+
+pygame.init()
+frame_rate = pygame.time.Clock()
 
 PATH = os.path.abspath('.') + '/'
 
@@ -28,6 +31,13 @@ PURPLE = (128, 0, 128)
 #globals
 WIDTH = 1024
 HEIGHT = 768
+
+info = pygame.display.Info()
+APP_WIDTH = info.current_w - 10
+APP_HEIGHT = info.current_h - 100
+
+SCALE_X = APP_WIDTH / WIDTH
+SCALE_Y = APP_HEIGHT / HEIGHT
 
 def get_color_by_percentage(percentage: str):
     percent = float(percentage)
@@ -55,18 +65,19 @@ class State(Enum):
 class Image:
     def __init__(self, path: str, pos: tuple, name: str, name_pos: tuple):
         self.path = path
-        self.pos = pos
+        self.pos = (pos[0] * SCALE_X, pos[1] * SCALE_Y)
         self.name = name
-        self.name_pos = name_pos
+        self.name_pos = (name_pos[0] * SCALE_X, name_pos[1] * SCALE_Y)
 
     def draw(self, window):
         img = pygame.image.load(PATH + self.path)
-        img = pygame.transform.scale(img, (350, 600))
+        img = pygame.transform.scale(img, (370 * SCALE_X, 520 * SCALE_Y))
         window.blit(img, self.pos)
 
         myfont = pygame.font.SysFont("Comic Sans MS", 50)
         label = myfont.render(self.name , 1, (0,0,0))
         window.blit(label, (self.name_pos[0], self.name_pos[1]))
+        pass
 
 class Brawler:
     def __init__(self, prof_icon: Image, winrate: str, playrate: str):
@@ -78,8 +89,8 @@ class Brawler:
         return float(self.winrate) * 0.3 + float(self.playrate) * 0.7 > float(other.winrate) * 0.3 + float(other.playrate) * 0.7
 
     def draw(self, window):
-        img = pygame.image.load(self.prof_icon.path)
-        img = pygame.transform.scale(img, (40, 40))
+        img = pygame.image.load(PATH + self.prof_icon.path)
+        img = pygame.transform.scale(img, (40 * SCALE_X, 40 * SCALE_Y))
         window.blit(img, self.prof_icon.pos)
 
         myfont = pygame.font.SysFont("Comic Sans MS", 40)
@@ -87,10 +98,10 @@ class Brawler:
         window.blit(label, (self.prof_icon.name_pos[0], self.prof_icon.name_pos[1]))
 
         label = myfont.render(self.winrate + "%", 1, get_color_by_percentage(self.winrate))
-        window.blit(label, (740, self.prof_icon.name_pos[1]))
+        window.blit(label, (740 * SCALE_X, self.prof_icon.name_pos[1]))
 
         label = myfont.render(self.playrate + "%", 1, get_color_by_percentage(self.playrate))
-        window.blit(label, (890, self.prof_icon.name_pos[1]))
+        window.blit(label, (890 * SCALE_X, self.prof_icon.name_pos[1]))
 
     def print(self):
         print("{} {} {}".format(self.prof_icon.name, self.winrate, self.playrate))
@@ -98,8 +109,8 @@ class Brawler:
 class Button:
     def __init__(self, name: str, pos: tuple, dimensions: tuple):
         self.name = name
-        self.pos = pos
-        self.dim = dimensions
+        self.pos = (pos[0] * SCALE_X, pos[1] * SCALE_Y)
+        self.dim = (dimensions[0] * SCALE_X, dimensions[1] * SCALE_Y)
         self.text_pos = (self.pos[0] + self.dim[0] // 8, self.pos[1] + self.dim[1] // 4)
         self.hovered = False
 
@@ -130,12 +141,16 @@ class Button:
         return State(curr_state.value + 1)
 
 class ReturnButton(Button):
+    def __init__(self, name: str, pos: tuple, dimensions: tuple):
+        super().__init__(name, pos, dimensions)
+        self.text_pos = (self.pos[0] + int(self.dim[0] / 3.5), self.pos[1] + self.dim[1] / 4)
+
     def draw(self, window):
         pygame.draw.rect(window, RED, (self.pos[0], self.pos[1], self.dim[0], self.dim[1]))
         if self.hovered == True:
             pygame.draw.rect(window, DARKR, (self.pos[0], self.pos[1], self.dim[0], self.dim[1]), 2)
 
-        myfont = pygame.font.SysFont("Comic Sans MS", 25)
+        myfont = pygame.font.SysFont("Comic Sans MS", 45)
         label = myfont.render(self.name , 1, (0,0,0))
         window.blit(label, (self.text_pos[0], self.text_pos[1]))
 
@@ -145,7 +160,7 @@ class ReturnButton(Button):
 class StatsButton(Button):
     def __init__(self, name: str, pos: tuple, dimensions: tuple):
         super().__init__(name, pos, dimensions)
-        self.text_pos = (self.pos[0] + int(self.dim[0] // 3.5), self.pos[1] + self.dim[1] // 4)
+        self.text_pos = (self.pos[0] + int(self.dim[0] / 3.5), self.pos[1] + self.dim[1] / 3)
 
     def on_press(self, _):
         return State.GAMEMODES_HOME
@@ -153,10 +168,10 @@ class StatsButton(Button):
 class ExitButton(Button):
     def __init__(self, name: str, pos: tuple, dimensions: tuple):
         super().__init__(name, pos, dimensions)
-        self.text_pos = (self.pos[0] + self.dim[0] // 3, self.pos[1] + self.dim[1] // 4)
+        self.text_pos = (self.pos[0] + self.dim[0] / 3, self.pos[1] + self.dim[1] / 3)
 
     def on_press(self, _):
-        os.remove(PATH + FILE_QUERY_PATH)
+        # os.remove(PATH + FILE_QUERY_PATH)
         exit(0)
 
 class GameModeButton(Button):
@@ -184,7 +199,7 @@ class MapButton(Button):
 class RankButton(Button):
     def __init__(self, name: str, pos: tuple, dimensions: tuple, id: int):
         super().__init__(name, pos, dimensions)
-        self.text_pos = (self.pos[0] + int(self.dim[0] // 2.5), self.pos[1] + self.dim[1] // 4)
+        self.text_pos = (self.pos[0] + int(self.dim[0] / 3.5), self.pos[1] + self.dim[1] / 3)
         self.selected = False
         self.id = id
         if id == 0:
@@ -212,7 +227,7 @@ class Screen:
 
     def draw(self, window):
         bg_img = pygame.image.load(self.background)
-        bg_img = pygame.transform.scale(bg_img,(WIDTH,HEIGHT))
+        bg_img = pygame.transform.scale(bg_img,(WIDTH * SCALE_X, HEIGHT * SCALE_Y))
         window.blit(bg_img, (0, 0))
 
         for button in self.buttons:
@@ -236,8 +251,8 @@ class HomeScreen(Screen):
     def __init__(self):
         super().__init__()
         self.buttons = [
-            StatsButton("Stats", (350, 300), (200, 50)), 
-            ExitButton("Exit", (350, 400), (200, 50))
+            StatsButton("Stats", (350, 150), (200, 100)), 
+            ExitButton("Exit", (350, 300), (200, 100))
         ]
 
 class StatsScreen(Screen):
@@ -251,7 +266,7 @@ class StatsScreen(Screen):
             GameModeButton(f.readline().strip(), (15, 200), (270, 90)),
             GameModeButton(f.readline().strip(), (375, 200), (270, 90)), 
             GameModeButton(f.readline().strip(), (735, 200), (270, 90)),
-            ReturnButton("Back", (0, 0), (50, 25))
+            ReturnButton("Back", (0, 0), (150, 55))
         ]
 
 class GameModeScreen(Screen):
@@ -268,7 +283,7 @@ class GameModeScreen(Screen):
             MapButton(g_mode1, img_path + g_mode1 + "_icon.png", (15, 100), (300, 150)), 
             MapButton(g_mode2, img_path + g_mode2 + "_icon.png", (360, 100), (300, 150)),
             MapButton(g_mode3, img_path + g_mode3 + "_icon.png", (705, 100), (300, 150)),
-            ReturnButton("Back", (0, 0), (50, 25))
+            ReturnButton("Back", (0, 0), (150, 55))
         ]
 
 class MapScreen(Screen):
@@ -278,50 +293,55 @@ class MapScreen(Screen):
         self.curr_rank = 0
         self.top_brawlers = [[], [], []]
         self.buttons = [
-            RankButton("LI - M", (0, 25), (WIDTH // 3, 30), 0),
-            RankButton("MI - MIII", (WIDTH // 3, 25), (WIDTH // 3, 30), 1),
-            RankButton("BI - DIII", (WIDTH // 3 * 2, 25), (WIDTH // 3, 30), 2),
-            ReturnButton("Back", (0, 0), (50, 25))
+            RankButton("LI - M", (40, 90), (120, 75), 0),
+            RankButton("MI - MIII", (175, 90), (120, 75), 1),
+            RankButton("BI - DIII", (310, 90), (120, 75), 2),
+            ReturnButton("Back", (0, 0), (150, 55))
         ]
 
     def draw(self, window):
-        super().draw(window)
-        pygame.draw.rect(window, LIGHTB, (30, 60, WIDTH - 60, HEIGHT - 70))
-        self.map.draw(window)
+        bg_img = pygame.image.load(self.background)
+        bg_img = pygame.transform.scale(bg_img,(WIDTH * SCALE_X, HEIGHT * SCALE_Y))
+        window.blit(bg_img, (0, 0))
 
-        pygame.draw.rect(window, RED, (50, 0, WIDTH - 50, 25))
+        pygame.draw.rect(window, LIGHTB, (30 * SCALE_X, 60 * SCALE_Y, (WIDTH - 60) * SCALE_X, (HEIGHT - 70) * SCALE_Y))
+
+        for button in self.buttons:
+            button.draw(window)
+
+        self.map.draw(window)
 
         myfont = pygame.font.SysFont("Comic Sans MS", 50)
         label = myfont.render("Nr." , 1, (0,0,0))
-        window.blit(label, (450, 60))
+        window.blit(label, (450 * SCALE_X, 60 * SCALE_Y))
 
         label = myfont.render("Brawler" , 1, (0,0,0))
-        window.blit(label, (525, 60))
+        window.blit(label, (525 * SCALE_X, 60 * SCALE_Y))
 
         label = myfont.render("Wr" , 1, (0,0,0))
-        window.blit(label, (750, 60))
+        window.blit(label, (750 * SCALE_X, 60 * SCALE_Y))
 
         label = myfont.render("Pr" , 1, (0,0,0))
-        window.blit(label, (910, 60))
+        window.blit(label, (910 * SCALE_X, 60 * SCALE_Y))
 
         label = myfont.render("1" , 1, (0,0,0))
-        pygame.draw.rect(window, GOLD, (450 + 8, 55 + 44 * 1, 30, 30))
-        window.blit(label, (450 + 13, 55 + 44 * 1))
+        pygame.draw.rect(window, GOLD, ((450 + 8) * SCALE_X, (55 + 44 * 1) * SCALE_Y, 30, 30))
+        window.blit(label, ((450 + 13) * SCALE_X, (55 + 44 * 1) * SCALE_Y))
 
         label = myfont.render("2" , 1, (0,0,0))
-        pygame.draw.rect(window, SILVER, (450 + 8, 55 + 44 * 2, 30, 30))
-        window.blit(label, (450 + 13, 55 + 44 * 2))
+        pygame.draw.rect(window, SILVER, ((450 + 8) * SCALE_X, (55 + 44 * 2) * SCALE_Y, 30, 30))
+        window.blit(label, ((450 + 13) * SCALE_X, (55 + 44 * 2) * SCALE_Y))
 
         label = myfont.render("3" , 1, (0,0,0))
-        pygame.draw.rect(window, BRONZE, (450 + 8, 55 + 44 * 3, 30, 30))
-        window.blit(label, (450 + 13, 55 + 44 * 3))
+        pygame.draw.rect(window, BRONZE, ((450 + 8) * SCALE_X, (55 + 44 * 3) * SCALE_Y, 30, 30))
+        window.blit(label, ((450 + 13) * SCALE_X, (55 + 44 * 3) * SCALE_Y))
 
         for i in range(4, 16, 1):
             label = myfont.render(str(i) , 1, (0,0,0))
             if i < 10:
-                window.blit(label, (450 + 13, 55 + 44 * i))
+                window.blit(label, ((450 + 13) * SCALE_X, (55 + 44 * i) * SCALE_Y))
             else:
-                window.blit(label, (450, 55 + 44 * i))
+                window.blit(label, (450 * SCALE_X, (55 + 44 * i) * SCALE_Y))
 
         for brawler in self.top_brawlers[self.curr_rank]:
             brawler.draw(window)
@@ -336,7 +356,7 @@ class MapScreen(Screen):
             else:
                 self.buttons[i].selected = False
 
-        self.map = Image("pictures/maps/" + file_name + ".png", (50, 125), file_name, (50, 80))
+        self.map = Image("pictures/maps/" + file_name + ".png", (50, 230), file_name, (50, 185))
         for rank in range(0, 3):
             sheet = wb_obj[wb_obj.sheetnames[rank]]
             total_games = 0
@@ -382,8 +402,8 @@ class MapScreen(Screen):
 
 class App:
     def __init__(self):
-        os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (600, 0)
-        self.window = pygame.display.set_mode((WIDTH, HEIGHT))
+        os.environ['SDL_VIDEO_CENTERED'] = '1'
+        self.window = pygame.display.set_mode((APP_WIDTH, APP_HEIGHT), pygame.SCALED | pygame.FULLSCREEN)
         pygame.display.set_caption('Power League Stats')
 
         self.wb_obj = openpyxl.load_workbook(PATH + FILE_QUERY_PATH)
@@ -437,14 +457,10 @@ class App:
 # t = tempfile.mkdtemp()
 # # Clone into temporary dir
 # Repo.clone_from('https://github.com/Stefan19K/BS_Power_League_Tracker', t, branch='main', depth=1)
-# print("done cloning")
 # # Copy desired file from temporary dir
 # shutil.move(os.path.join(t, FILE_PATH), FILE_QUERY_PATH)
 # # Remove temporary dir
 # shutil.rmtree(t)
-
-pygame.init()
-frame_rate = pygame.time.Clock()
 
 app = App()
 
@@ -453,4 +469,4 @@ while app.running:
     app.update()
     app.input()
 
-os.remove(PATH + FILE_QUERY_PATH)
+# os.remove(PATH + FILE_QUERY_PATH)
