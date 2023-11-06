@@ -4,7 +4,7 @@ from enum import Enum
 import time
 from client import *
 import openpyxl
-from globals.globals_season20 import *
+from globals.globals_season21 import *
 
 class Rank(Enum):
     LI_M = 0

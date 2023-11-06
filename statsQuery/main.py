@@ -1,9 +1,9 @@
 from enum import Enum
 import openpyxl
-from globals.globals_season20 import *
+from globals.globals_season21 import *
 import shutil
 import os
-# from git import Repo
+from git import Repo
 import tempfile
 import pygame
 from pygame.locals import *
@@ -403,7 +403,7 @@ class MapScreen(Screen):
 class App:
     def __init__(self):
         os.environ['SDL_VIDEO_CENTERED'] = '1'
-        self.window = pygame.display.set_mode((APP_WIDTH, APP_HEIGHT), pygame.SCALED | pygame.FULLSCREEN)
+        self.window = pygame.display.set_mode((APP_WIDTH, APP_HEIGHT), pygame.FULLSCREEN)
         pygame.display.set_caption('Power League Stats')
 
         self.wb_obj = openpyxl.load_workbook(PATH + FILE_QUERY_PATH)
@@ -453,14 +453,14 @@ class App:
         pygame.display.update()
         frame_rate.tick(60)
 
-# # Create temporary dir
-# t = tempfile.mkdtemp()
-# # Clone into temporary dir
-# Repo.clone_from('https://github.com/Stefan19K/BS_Power_League_Tracker', t, branch='main', depth=1)
-# # Copy desired file from temporary dir
-# shutil.move(os.path.join(t, FILE_PATH), FILE_QUERY_PATH)
-# # Remove temporary dir
-# shutil.rmtree(t)
+# Create temporary dir
+t = tempfile.mkdtemp()
+# Clone into temporary dir
+Repo.clone_from('https://github.com/Stefan19K/BS_Power_League_Tracker', t, branch='main', depth=1)
+# Copy desired file from temporary dir
+shutil.move(os.path.join(t, FILE_PATH), FILE_QUERY_PATH)
+# Remove temporary dir
+shutil.rmtree(t)
 
 app = App()
 
